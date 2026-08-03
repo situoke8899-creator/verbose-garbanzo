@@ -41,27 +41,60 @@ function classifyThree(value) {
 
   if (digits.length !== 3) return ''
 
+  const [a, b, c] = digits
   const unique = new Set(digits)
 
-  if (unique.size === 1) return '豹子'
-  if (unique.size === 2) return '对子'
+  // 三个数字完全相同
+  if (unique.size === 1) {
+    return '豹子'
+  }
 
-  const sorted = [...digits].sort((a, b) => a - b)
+  // 恰好两个数字相同
+  if (unique.size === 2) {
+    return '对子'
+  }
 
-  if (
+  // 三个数字都不同后，再判断顺子。
+  // 0和9首尾相连，因此以下号码也属于顺子：
+  // 019、091、109、190、901、910
+  // 089、098、809、890、908、980
+  const sorted = [...digits].sort((x, y) => x - y)
+
+  const normalStraight =
     sorted[1] === sorted[0] + 1 &&
     sorted[2] === sorted[1] + 1
+
+  const circular019 =
+    sorted[0] === 0 &&
+    sorted[1] === 1 &&
+    sorted[2] === 9
+
+  const circular089 =
+    sorted[0] === 0 &&
+    sorted[1] === 8 &&
+    sorted[2] === 9
+
+  if (
+    normalStraight ||
+    circular019 ||
+    circular089
   ) {
     return '顺子'
   }
 
-  const [a, b, c] = digits
+  // 半顺也按0和9首尾相连处理。
+  // 三个数字中任意两个相邻，就属于半顺。
+  const isAdjacent = (x, y) => {
+    const diff = Math.abs(x - y)
+    return diff === 1 || diff === 9
+  }
 
-  if (
-    Math.abs(a - b) === 1 ||
-    Math.abs(a - c) === 1 ||
-    Math.abs(b - c) === 1
-  ) {
+  const hasAdjacent =
+    isAdjacent(a, b) ||
+    isAdjacent(a, c) ||
+    isAdjacent(b, c)
+
+  if (hasAdjacent) {
     return '半顺'
   }
 
