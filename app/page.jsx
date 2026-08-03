@@ -760,6 +760,73 @@ function buildSingleBestPrediction(rankedStrategies) {
   })[0] || null
 }
 
+
+function buildSingleBestFrozenRows(
+  frozenRows,
+  singleBest,
+  size = 30
+) {
+  if (
+    !singleBest ||
+    !Array.isArray(frozenRows)
+  ) {
+    return []
+  }
+
+  return frozenRows
+    .slice(0, size)
+    .map(({ record, draw }) => {
+      const strategy =
+        record?.strategies?.find(
+          (item) =>
+            item.id === singleBest.strategyId
+        )
+
+      if (!strategy) return null
+
+      let predictedShapes = []
+      let actualShape = ''
+      let actualCode = ''
+
+      if (singleBest.segmentKey === 'front') {
+        predictedShapes =
+          strategy.frontShapes || []
+        actualShape = draw.frontShape
+        actualCode = draw.front
+      } else if (
+        singleBest.segmentKey === 'middle'
+      ) {
+        predictedShapes =
+          strategy.middleShapes || []
+        actualShape = draw.middleShape
+        actualCode = draw.middle
+      } else {
+        predictedShapes =
+          strategy.backShapes || []
+        actualShape = draw.backShape
+        actualCode = draw.back
+      }
+
+      const hit = predictedShapes.includes(
+        actualShape
+      )
+
+      return {
+        block: draw.block,
+        openTime: draw.openTime,
+        fiveDigits: draw.fiveDigits,
+        actualCode,
+        actualShape,
+        predictedShapes,
+        hit,
+        backfilled: Boolean(
+          record?.backfilled
+        ),
+      }
+    })
+    .filter(Boolean)
+}
+
 function ShapeBadge({ shape }) {
   return (
     <span className={`shape shape-${shape}`}>
@@ -877,6 +944,15 @@ export default function Page() {
 
   const latest = history[0]
 
+  const singleBestFrozen30 = useMemo(
+    () => buildSingleBestFrozenRows(
+      frozenRows,
+      singleBest,
+      30
+    ),
+    [frozenRows, singleBest]
+  )
+
   const amountNumber = Number(betAmount || 0)
   const oddsNumber = Number(odds || 0)
   const totalBet = amountNumber * 3
@@ -951,7 +1027,7 @@ export default function Page() {
         .freeze{padding:11px;border-radius:12px;background:rgba(2,6,23,.3);border:1px solid rgba(148,163,184,.13)}
         .freeze-top{display:flex;justify-content:space-between;gap:8px}
         .digits{font-size:27px;font-weight:900;letter-spacing:7px;color:#fde047}
-        .triples{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+        .triples{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.single-freeze-box{margin-top:14px;padding:12px;border-radius:14px;background:rgba(2,6,23,.34);border:1px solid rgba(148,163,184,.16)}.single-freeze-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.single-freeze-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-top:10px}.single-freeze-item{padding:8px 6px;border-radius:10px;text-align:center;border:1px solid rgba(148,163,184,.14);background:rgba(15,23,42,.55)}.single-freeze-item.hit{background:rgba(34,197,94,.14);border-color:rgba(74,222,128,.45)}.single-freeze-item.miss{background:rgba(239,68,68,.12);border-color:rgba(248,113,113,.35)}.single-freeze-item strong{display:block;font-size:13px}.single-freeze-item span{display:block;margin-top:4px;font-size:12px}.single-freeze-code{font-size:16px;font-weight:900;color:#fde047}.single-freeze-shape{font-size:12px;margin-top:3px}.single-freeze-result{font-size:12px;font-weight:900;margin-top:4px}.single-freeze-result.good{color:#4ade80}.single-freeze-result.bad{color:#fb7185}
         .triple{padding:8px;border-radius:10px;background:rgba(2,6,23,.3);border:1px solid rgba(148,163,184,.13)}
         @media(max-width:900px){
           .hero,.grid{display:block}
@@ -1048,6 +1124,7 @@ export default function Page() {
                   <p className="muted" style={{ marginBottom: 0 }}>
                     系统会在10个方案的前三、中三、后三共30个候选中，
                     只挑选一个综合中奖率最高的位置推荐。
+                    右侧会显示该推荐位置最近30期的冻结中/未中记录。
                     例如前三中奖率最高，就只推荐前三的两个形态；
                     中三、后三不会同时显示为下期推荐。
                   </p>
@@ -1117,6 +1194,68 @@ export default function Page() {
             <p className="hash">
               {latest?.hash || '-'}
             </p>
+
+            <div className="single-freeze-box">
+              <div className="single-freeze-head">
+                <div>
+                  <strong>
+                    当前优化推荐｜近30期冻结中奖情况
+                  </strong>
+
+                  <div className="muted">
+                    {singleBest
+                      ? `${singleBest.segmentLabel}｜${singleBest.strategyName}｜预测 ${singleBest.shapes.join('、')}`
+                      : '等待最优推荐生成'}
+                  </div>
+                </div>
+
+                <div className="muted">
+                  命中
+                  {' '}
+                  {
+                    singleBestFrozen30.filter(
+                      (item) => item.hit
+                    ).length
+                  }
+                  /
+                  {singleBestFrozen30.length}
+                </div>
+              </div>
+
+              <div className="single-freeze-grid">
+                {singleBestFrozen30.map((item) => (
+                  <div
+                    className={`single-freeze-item ${item.hit ? 'hit' : 'miss'}`}
+                    key={item.block}
+                    title={`区块 ${item.block}｜预测 ${item.predictedShapes.join('、')}｜实际 ${item.actualShape}`}
+                  >
+                    <strong>
+                      {item.block}
+                    </strong>
+
+                    <span className="single-freeze-code">
+                      {item.actualCode}
+                    </span>
+
+                    <span className="single-freeze-shape">
+                      {item.actualShape}
+                    </span>
+
+                    <span className={`single-freeze-result ${item.hit ? 'good' : 'bad'}`}>
+                      {item.hit ? '中' : '未中'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {!singleBestFrozen30.length ? (
+                <p className="muted">
+                  暂无冻结记录。第一次使用本版本时，
+                  系统会按当前方案补建历史冻结；
+                  下一期开奖前会保存真实冻结方案。
+                </p>
+              ) : null}
+            </div>
           </div>
         </section>
 
