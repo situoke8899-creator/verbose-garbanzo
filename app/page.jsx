@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 const REFRESH_MS = 5000
 const SHAPES = ['豹子', '顺子', '对子', '杂六', '半顺']
-const FREEZE_VERSION = 'hash-last5-shape-top2-v2'
+const FREEZE_VERSION = 'hash-last5-circular-straight-v8'
 
 function fmtPercent(value) {
   return `${Number(value || 0).toFixed(2)}%`
@@ -71,27 +71,55 @@ function classifyThree(value) {
   const [a, b, c] = digits
   const unique = new Set(digits)
 
+  // 三个数字完全相同
   if (unique.size === 1) {
     return '豹子'
   }
 
+  // 恰好两个数字相同
   if (unique.size === 2) {
     return '对子'
   }
 
+  // 三个数字都不同后，再判断顺子。
+  // 0和9首尾相连，因此以下号码也属于顺子：
+  // 019、091、109、190、901、910
+  // 089、098、809、890、908、980
   const sorted = [...digits].sort((x, y) => x - y)
 
-  if (
+  const normalStraight =
     sorted[1] === sorted[0] + 1 &&
     sorted[2] === sorted[1] + 1
+
+  const circular019 =
+    sorted[0] === 0 &&
+    sorted[1] === 1 &&
+    sorted[2] === 9
+
+  const circular089 =
+    sorted[0] === 0 &&
+    sorted[1] === 8 &&
+    sorted[2] === 9
+
+  if (
+    normalStraight ||
+    circular019 ||
+    circular089
   ) {
     return '顺子'
   }
 
+  // 半顺也按0和9首尾相连处理。
+  // 三个数字中任意两个相邻，就属于半顺。
+  const isAdjacent = (x, y) => {
+    const diff = Math.abs(x - y)
+    return diff === 1 || diff === 9
+  }
+
   const hasAdjacent =
-    Math.abs(a - b) === 1 ||
-    Math.abs(a - c) === 1 ||
-    Math.abs(b - c) === 1
+    isAdjacent(a, b) ||
+    isAdjacent(a, c) ||
+    isAdjacent(b, c)
 
   if (hasAdjacent) {
     return '半顺'
@@ -1510,16 +1538,24 @@ export default function Page() {
               </p>
 
               <p className="muted">
-                顺子：三个不同数字排序后连续，例如123、321、543。
+                顺子：三个不同数字组成连续数；0和9首尾相连，例如123、543、019、890。
               </p>
 
               <p className="muted">
-                半顺：三个数字不同，其中任意两个相差1，例如821。
+                半顺：三个数字不同，其中任意两个相邻；0和9也视为相邻，例如821、904。
               </p>
 
               <p className="muted">
                 杂六：三个数字不同，且没有任意两个相差1，例如058、582。
               </p>
+
+              <div className="box">
+                <strong>循环顺子示例</strong>
+                <p className="muted">
+                  019、091、109、190、901、910都算顺子；
+                  089、098、809、890、908、980也都算顺子。
+                </p>
+              </div>
 
               <div className="box">
                 <strong>示例05821</strong>
